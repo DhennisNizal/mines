@@ -1,10 +1,14 @@
+// BettingForm.js
 import { useState, useEffect } from "react";
 import { Wrapper, Content } from "./styles";
+import ConfirmationModal from "../../components/modal";
 import {
   generateCombinationsForBet,
   getTayaDetails,
   validateBetInput,
 } from "../../helpers/helpers";
+
+const STORAGE_KEY = "stl_bets_data";
 
 const BettingForm = () => {
   const [type, setType] = useState(2);
@@ -16,6 +20,30 @@ const BettingForm = () => {
   const [bets, setBets] = useState([]);
   const [error, setError] = useState("");
   const [sortedBets, setSortedBets] = useState([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Load bets from localStorage on initial render
+  useEffect(() => {
+    const savedBets = localStorage.getItem(STORAGE_KEY);
+    if (savedBets) {
+      try {
+        const parsedBets = JSON.parse(savedBets);
+        setBets(parsedBets);
+      } catch (error) {
+        console.error("Error loading saved bets:", error);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Save bets to localStorage whenever bets change
+  useEffect(() => {
+    if (bets.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(bets));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [bets]);
 
   useEffect(() => {
     // Sort bets from highest to lowest total amount
@@ -135,7 +163,16 @@ const BettingForm = () => {
   };
 
   const handleClearBets = () => {
+    setShowConfirmModal(true);
+  };
+
+  const confirmClearBets = () => {
     setBets([]);
+    setShowConfirmModal(false);
+  };
+
+  const cancelClearBets = () => {
+    setShowConfirmModal(false);
   };
 
   const handleTypeChange = (newType) => {
@@ -183,10 +220,25 @@ const BettingForm = () => {
                 key={index}
                 type="number"
                 placeholder={`#${index + 1}`}
-                min="0"
-                max="99"
+                min="1"
+                max="38"
                 value={numbers[index]}
                 onChange={(e) => handleNumberChange(index, e.target.value)}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  if (value !== "") {
+                    const num = parseInt(value);
+                    if (num < 1) {
+                      const newNumbers = [...numbers];
+                      newNumbers[index] = "1";
+                      setNumbers(newNumbers);
+                    } else if (num > 38) {
+                      const newNumbers = [...numbers];
+                      newNumbers[index] = "38";
+                      setNumbers(newNumbers);
+                    }
+                  }
+                }}
               />
             ))}
           </div>
@@ -196,7 +248,7 @@ const BettingForm = () => {
             value={tayaType}
             onChange={(e) => handleTayaTypeChange(e.target.value)}
           >
-            <option value="taya">Custom Bet</option>
+            <option value="taya">Taya</option>
             <option value="gitna">Gitna</option>
             <option value="20-10">20-10</option>
             <option value="20-5">20-5</option>
@@ -208,6 +260,7 @@ const BettingForm = () => {
             <option value="7-3">7-3</option>
             <option value="5-2">5-2</option>
             <option value="4-1">4-1</option>
+            <option value="3-2">3-2</option>
           </select>
 
           {tayaType === "taya" && (
@@ -252,9 +305,11 @@ const BettingForm = () => {
         <div className="bets-summary">
           <div className="summary-header">
             <div className="summary-title">Live Bets Summary</div>
-            <button className="clear-button" onClick={handleClearBets}>
-              Clear All
-            </button>
+            {sortedBets.length > 0 && (
+              <button className="clear-button" onClick={handleClearBets}>
+                Clear All
+              </button>
+            )}
           </div>
 
           {sortedBets.length === 0 ? (
@@ -310,6 +365,15 @@ const BettingForm = () => {
           )}
         </div>
       </Content>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={cancelClearBets}
+        onConfirm={confirmClearBets}
+        title="Clear All Bets"
+        message="Are you sure you want to clear all bets? This action cannot be undone."
+      />
     </Wrapper>
   );
 };
